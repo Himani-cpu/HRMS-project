@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://hrms-backend-5miy.onrender.com";
 
 export const authFetch = async (url, options = {}) => {
   const token = localStorage.getItem("token");
