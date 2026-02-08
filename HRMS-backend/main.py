@@ -23,7 +23,7 @@ app = FastAPI(title="HRMS Lite API")
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://hrms-project-five.vercel.app",  # your deployed frontend
+    "https://hrms-project-five.vercel.app",
 ]
 
 app.add_middleware(
@@ -241,32 +241,18 @@ def dashboard_stats(
         models.Attendance.date.between(start_date, end_date)
     )
 
-    total_attendance = attendance_in_range.count()
-
-    present_count = attendance_in_range.filter(
-        models.Attendance.status == "Present"
-    ).count()
-
-    absent_count = attendance_in_range.filter(
-        models.Attendance.status == "Absent"
-    ).count()
-
-    leave_count = attendance_in_range.filter(
-        models.Attendance.status == "Leave"
-    ).count()
-
     return {
         "total_employees": total_employees,
         "total_departments": total_departments,
-        "attendance_in_range": total_attendance,
-        "present": present_count,
-        "absent": absent_count,
-        "leave": leave_count,
+        "attendance_in_range": attendance_in_range.count(),
+        "present": attendance_in_range.filter(models.Attendance.status == "Present").count(),
+        "absent": attendance_in_range.filter(models.Attendance.status == "Absent").count(),
+        "leave": attendance_in_range.filter(models.Attendance.status == "Leave").count(),
     }
 
 
 # =====================================================
-# 🔎 SEARCH + DEPARTMENT STATS (PROTECTED)
+# 🔎 SEARCH + DEPARTMENT STATS
 # =====================================================
 
 @app.get("/employees/search", response_model=List[schemas.EmployeeOut])
@@ -295,9 +281,10 @@ def department_stats(
 
 
 # =====================================================
-# 👑 CREATE DEFAULT ADMIN (ON START)
+# 👑 CREATE DEFAULT ADMIN SAFELY
 # =====================================================
 
+@app.on_event("startup")
 def create_default_admin():
     db: Session = SessionLocal()
 
@@ -309,6 +296,3 @@ def create_default_admin():
         db.commit()
 
     db.close()
-
-
-create_default_admin()
