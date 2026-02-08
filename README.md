@@ -53,7 +53,7 @@ GitHub → Source code management
 ## Steps to Run the Project Locally
 
 ### Clone the repository
-git clone https://github.com/YOUR-USERNAME/HRMS-project.git
+git clone https://github.com/Himani-cpu/HRMS-project.git
 cd HRMS-project
 
 ### Run Backend 
