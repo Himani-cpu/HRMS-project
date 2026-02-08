@@ -14,7 +14,7 @@ function Login() {
     formData.append("password", password);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/login", {
+      const res = await fetch("https://hrms-backend-5miy.onrender.com/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -29,10 +29,10 @@ function Login() {
 
       const data = await res.json();
 
-      // 🔐 Save JWT token
+      // Save JWT token
       localStorage.setItem("token", data.access_token);
 
-      // 🚀 Redirect to dashboard
+      // Redirect to dashboard
       navigate("/");
     } catch (err) {
       console.error("Login error:", err);
