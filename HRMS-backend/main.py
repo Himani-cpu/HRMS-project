@@ -294,3 +294,24 @@ def department_stats(
     )
 
     return [{"department": dept, "count": count} for dept, count in results]
+
+
+from sqlalchemy.orm import Session
+from database import SessionLocal
+from models import User
+
+
+def create_default_admin():
+    db: Session = SessionLocal()
+
+    user = db.query(User).filter(User.username == "admin").first()
+
+    if not user:
+        admin = User(username="admin", password="admin")
+        db.add(admin)
+        db.commit()
+
+    db.close()
+
+
+create_default_admin()
