@@ -23,6 +23,7 @@ app = FastAPI(title="HRMS Lite API")
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://hrms-project-five.vercel.app",  # your deployed frontend
 ]
 
 app.add_middleware(
@@ -53,12 +54,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Simple admin login (for project)
-fake_user = {
-    "username": "admin",
-    "password": "admin123",
-}
-
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
@@ -67,7 +62,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
@@ -82,20 +77,23 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
-    return username
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise credentials_exception
+
+    return user
 
 
 # ---------------- LOGIN API ----------------
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    if (
-        form_data.username != fake_user["username"]
-        or form_data.password != fake_user["password"]
-    ):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
+
+    if not user or user.password != form_data.password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     access_token = create_access_token(
-        data={"sub": form_data.username},
+        data={"sub": user.username},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
@@ -119,7 +117,7 @@ def root():
 def add_employee(
     emp: schemas.EmployeeCreate,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     existing = db.query(models.Employee).filter(
         models.Employee.employee_id == emp.employee_id
@@ -139,7 +137,7 @@ def add_employee(
 @app.get("/employees", response_model=List[schemas.EmployeeOut])
 def get_employees(
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     return db.query(models.Employee).all()
 
@@ -148,7 +146,7 @@ def get_employees(
 def delete_employee(
     employee_id: str,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     emp = db.query(models.Employee).filter(
         models.Employee.employee_id == employee_id
@@ -167,7 +165,7 @@ def update_employee(
     employee_id: str,
     emp: schemas.EmployeeCreate,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     db_emp = db.query(models.Employee).filter(
         models.Employee.employee_id == employee_id
@@ -194,7 +192,7 @@ def update_employee(
 def mark_attendance(
     rec: schemas.AttendanceCreate,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     emp = db.query(models.Employee).filter(
         models.Employee.employee_id == rec.employee_id
@@ -215,7 +213,7 @@ def mark_attendance(
 def get_attendance(
     employee_id: str,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     return db.query(models.Attendance).filter(
         models.Attendance.employee_id == employee_id
@@ -231,7 +229,7 @@ def dashboard_stats(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     total_employees = db.query(func.count(models.Employee.id)).scalar()
 
@@ -275,7 +273,7 @@ def dashboard_stats(
 def search_employees(
     name: str,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     return db.query(models.Employee).filter(
         models.Employee.name.ilike(f"%{name}%")
@@ -285,7 +283,7 @@ def search_employees(
 @app.get("/departments/stats")
 def department_stats(
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user),
+    user: models.User = Depends(get_current_user),
 ):
     results = (
         db.query(models.Employee.department, func.count(models.Employee.id))
@@ -296,18 +294,17 @@ def department_stats(
     return [{"department": dept, "count": count} for dept, count in results]
 
 
-from sqlalchemy.orm import Session
-from database import SessionLocal
-from models import User
-
+# =====================================================
+# 👑 CREATE DEFAULT ADMIN (ON START)
+# =====================================================
 
 def create_default_admin():
     db: Session = SessionLocal()
 
-    user = db.query(User).filter(User.username == "admin").first()
+    user = db.query(models.User).filter(models.User.username == "admin").first()
 
     if not user:
-        admin = User(username="admin", password="admin")
+        admin = models.User(username="admin", password="admin123")
         db.add(admin)
         db.commit()
 
