@@ -6,7 +6,7 @@ HRMS Lite is a full-stack web application designed to manage employees and their
 
 The system provides:
 
-Secure JWT-based login
+Secure JWT-based login 
 
 Complete Employee CRUD operations
 
